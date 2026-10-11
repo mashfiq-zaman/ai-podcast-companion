@@ -1,0 +1,31 @@
+# secrets — keep this at the top, it is the one that matters
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+ 
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+ 
+# virtual environments
+myvenv/
+venv/
+.venv/
+env/
+ 
+# local data & scratch
+*.db
+*.sqlite3
+data/
+transcripts/
+*.log
+ 
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+ 
