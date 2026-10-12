@@ -1,29 +1,34 @@
 
 
 import json
+import time
 
 import streamlit as st
 
 from pipeline import (
-   max_chars,
-   min_chars,
+    max_chars,
+    min_chars,
     chapter_times,
     generate_all,
+    revise,
     validate_transcript,
 )
 
 st.set_page_config(page_title="AI Podcast Companion", page_icon="🎧", layout="centered")
 
 
-
+# ---------------------------------------------------------------------------
 # State
+#
 # Separate slots per artifact. Each can be replaced on its own, which is what
-# makes the revision feature possible without regenerating everything.
+# lets a revision regenerate one section without touching the other two.
+# ---------------------------------------------------------------------------
 
 for slot in ["transcript", "segments", "summary", "chapters", "quiz"]:
     st.session_state.setdefault(slot, None)
 
 st.session_state.setdefault("quiz_checked", False)
+st.session_state.setdefault("revisions", {})     # kind -> what was asked, how long
 
 
 def clear_results() -> None:
@@ -32,13 +37,80 @@ def clear_results() -> None:
     st.session_state.chapters = None
     st.session_state.quiz = None
     st.session_state.quiz_checked = False
+    st.session_state.revisions = {}
 
 
 def has_results() -> bool:
     return st.session_state.summary is not None
 
 
+# ---------------------------------------------------------------------------
+# Revision
+# ---------------------------------------------------------------------------
+
+PLACEHOLDERS = {
+    "summary": "e.g. make it shorter, or explain it more simply",
+    "chapters": "e.g. use fewer chapters, or make the titles more descriptive",
+    "quiz": "e.g. make the questions harder, or ask more about the examples",
+}
+
+
+def revision_control(kind: str, current) -> None:
+    """A text box and a button that regenerate ONE artifact."""
+    previous = st.session_state.revisions.get(kind)
+    if previous:
+        st.caption(
+            f'Last change: "{previous["instruction"]}" '
+            f'({previous["seconds"]:.1f}s — this section only)'
+        )
+
+    with st.expander("Revise this section"):
+        st.caption(
+            "Describe the change you want. Only this section is regenerated; "
+            "the other two stay as they are."
+        )
+
+        instruction = st.text_input(
+            "Change",
+            key=f"instruction_{kind}",
+            placeholder=PLACEHOLDERS[kind],
+            label_visibility="collapsed",
+        )
+
+        if st.button("Apply change", key=f"revise_{kind}",
+                     disabled=not instruction.strip()):
+            with st.spinner(f"Revising the {kind}…"):
+                try:
+                    started = time.perf_counter()
+                    revised = revise(
+                        kind, st.session_state.transcript, current, instruction
+                    )
+                    elapsed = time.perf_counter() - started
+                except Exception as exc:
+                    st.error(
+                        "The revision could not be completed. "
+                        "This is usually a temporary API problem — try again."
+                    )
+                    with st.expander("Technical detail"):
+                        st.code(f"{type(exc).__name__}: {exc}")
+                    return
+
+            # Replace one slot. The other two are untouched.
+            st.session_state[kind] = revised
+            st.session_state.revisions[kind] = {
+                "instruction": instruction,
+                "seconds": elapsed,
+            }
+
+            if kind == "quiz":
+                st.session_state.quiz_checked = False      # answers no longer apply
+
+            st.rerun()
+
+
+# ---------------------------------------------------------------------------
 # Export helpers
+# ---------------------------------------------------------------------------
 
 def results_as_markdown() -> str:
     summary = st.session_state.summary
@@ -80,12 +152,15 @@ def results_as_json() -> str:
                 for chapter, label in zip(chapters.chapters, times)
             ],
             "quiz": st.session_state.quiz.model_dump(),
+            "revisions": st.session_state.revisions,
         },
         indent=2,
     )
 
 
+# ---------------------------------------------------------------------------
 # Header and input
+# ---------------------------------------------------------------------------
 
 st.title("🎧 AI Podcast Companion")
 st.caption("Paste a podcast transcript and get a summary, chapters and a quiz.")
@@ -97,11 +172,11 @@ with st.expander("What this accepts", expanded=not has_results()):
         {max_chars:,} characters (roughly 2 to 200 minutes of speech).
 
         **Timestamps:** if the transcript carries time markers on their own
-        lines, the format YouTube's transcript panel produces, chapter start
+        lines — the format YouTube's transcript panel produces — chapter start
         times are derived from them. Without markers, chapters are listed in
         order with no times. Times are never invented.
 
-        Not supported: audio file upload.
+        **Not supported:** audio file upload.
 
         Content is sent to the Gemini API for processing. Use material you have
         permission to share.
@@ -121,6 +196,8 @@ left, right = st.columns([3, 1])
 with left:
     if characters:
         st.caption(f"{characters:,} characters")
+    else:
+        st.caption("Paste a transcript, tap outside the box, then press Generate.")
 with right:
     generate_clicked = st.button(
         "Generate", type="primary", use_container_width=True,
@@ -128,9 +205,9 @@ with right:
     )
 
 
-
+# ---------------------------------------------------------------------------
 # Generate
-
+# ---------------------------------------------------------------------------
 
 if generate_clicked:
     try:
@@ -160,8 +237,9 @@ if generate_clicked:
     st.session_state.quiz = results["quiz"]
 
 
+# ---------------------------------------------------------------------------
 # Results
-
+# ---------------------------------------------------------------------------
 
 if has_results():
     st.divider()
@@ -188,6 +266,9 @@ if has_results():
         for takeaway in summary.takeaways:
             st.markdown(f"- {takeaway}")
 
+        st.write("")
+        revision_control("summary", summary)
+
     # ---- Chapters
     with chapters_tab:
         chapters = st.session_state.chapters
@@ -209,6 +290,8 @@ if has_results():
             st.write(chapter.description)
             st.caption(f'Starts: "{chapter.opening_line}"')
             st.write("")
+
+        revision_control("chapters", chapters)
 
     # ---- Quiz
     with quiz_tab:
@@ -259,6 +342,9 @@ if has_results():
             )
             st.info(f"Score: {correct} out of {len(quiz.questions)}")
 
+        st.write("")
+        revision_control("quiz", quiz)
+
     # ---- Download
     st.divider()
 
@@ -279,3 +365,11 @@ if has_results():
             mime="application/json",
             use_container_width=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# Footer
+# ---------------------------------------------------------------------------
+
+st.divider()
+st.caption("Built by Mashfiq Uz Zaman · © 2026")
