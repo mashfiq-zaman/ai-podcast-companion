@@ -13,9 +13,9 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 gemini_model='models/gemini-3.5-flash-lite'  ## 500 req/day on free
-groq_model='llama-3.3-70b-versatile'    ##fallback backup
+groq_model="openai/gpt-oss-120b"   ##fallback backup
  
-timeout_seconds=60
+timeout_seconds=30
 max_chars=120_000
 min_chars=200
 
