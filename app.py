@@ -17,12 +17,9 @@ from pipeline import (
 st.set_page_config(page_title="AI Podcast Companion", page_icon="🎧", layout="centered")
 
 
-# ---------------------------------------------------------------------------
+
 # State
-#
-# Separate slots per artifact. Each can be replaced on its own, which is what
-# lets a revision regenerate one section without touching the other two.
-# ---------------------------------------------------------------------------
+
 
 for slot in ["transcript", "segments", "summary", "chapters", "quiz"]:
     st.session_state.setdefault(slot, None)
@@ -44,9 +41,7 @@ def has_results() -> bool:
     return st.session_state.summary is not None
 
 
-# ---------------------------------------------------------------------------
 # Revision
-# ---------------------------------------------------------------------------
 
 PLACEHOLDERS = {
     "summary": "e.g. make it shorter, or explain it more simply",
@@ -108,9 +103,7 @@ def revision_control(kind: str, current) -> None:
             st.rerun()
 
 
-# ---------------------------------------------------------------------------
 # Export helpers
-# ---------------------------------------------------------------------------
 
 def results_as_markdown() -> str:
     summary = st.session_state.summary
@@ -158,10 +151,7 @@ def results_as_json() -> str:
     )
 
 
-# ---------------------------------------------------------------------------
 # Header and input
-# ---------------------------------------------------------------------------
-
 st.title("🎧 AI Podcast Companion")
 st.caption("Paste a podcast transcript and get a summary, chapters and a quiz.")
 
@@ -205,9 +195,7 @@ with right:
     )
 
 
-# ---------------------------------------------------------------------------
 # Generate
-# ---------------------------------------------------------------------------
 
 if generate_clicked:
     try:
@@ -237,9 +225,7 @@ if generate_clicked:
     st.session_state.quiz = results["quiz"]
 
 
-# ---------------------------------------------------------------------------
 # Results
-# ---------------------------------------------------------------------------
 
 if has_results():
     st.divider()
@@ -365,11 +351,6 @@ if has_results():
             mime="application/json",
             use_container_width=True,
         )
-
-
-# ---------------------------------------------------------------------------
-# Footer
-# ---------------------------------------------------------------------------
 
 st.divider()
 st.caption("Built by Mashfiq Uz Zaman · © 2026")
