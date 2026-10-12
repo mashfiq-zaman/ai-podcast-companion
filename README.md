@@ -95,5 +95,3 @@ Output quality is bounded by transcript quality. Auto-generated captions contain
 Nothing is stored. Refreshing the page loses the results.
 Prompts and output are English only.
 Transcripts over 120,000 characters are rejected rather than chunked.
-
-The engineering notes go into each of these properly, along with what I would do about them.
